@@ -135,7 +135,7 @@ def io_material_stb(processor):
 
 
 def io_material_creep(processor):
-    processor.integer('unknownda1b4eb3')
+    processor.integer('unknownda1b4eb3', since_version=1)
 
 
 def io_material_reflection(processor):
