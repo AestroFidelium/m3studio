@@ -1,3 +1,15 @@
+# M3GLB_IMP_PATCHED
+def _get_fcurves(action):
+    native = getattr(action, 'fcurves', None)
+    if native is not None:
+        try:
+            list(native)
+            return native
+        except Exception:
+            pass
+    from . import m3_animations as _ma
+    return _ma._FakeFCurves(action)
+
 # ##### BEGIN GPL LICENSE BLOCK #####
 #
 #  This program is free software; you can redistribute it and/or
@@ -305,7 +317,7 @@ def key_fcurves(stc_dict, bl, field, header, default):
 
         key_sel_seq = [False] * points_len
         for index, index_data in enumerate(anim_id_action_data):
-            fcurves = bpy.data.actions.get(action_name).fcurves
+            fcurves = _get_fcurves(bpy.data.actions.get(action_name))
             fcurve = fcurves.new(path, index=index)
             fcurve.select = False
             fcurve.keyframe_points.add(points_len)
@@ -419,7 +431,7 @@ class Importer:
         user_matref_index = self.ob.m3_materialrefs_index
         for ii in reversed(range(len(self.ob.m3_materialrefs))[matref_len:]):
             self.ob.m3_materialrefs_index = ii
-            bpy.ops.m3.material_remove('INVOKE_DEFAULT', quiet=True)
+            None  # m3.material_remove disabled in headless mode
         self.ob.m3_materialrefs_index = user_matref_index
 
     def m3a_import(self, filepath, ob):
@@ -565,7 +577,7 @@ class Importer:
             # we put in original data first so that we can evaluate the fcurves.
             # blender interpolates the data we need to apply the correction matrices for us.
             # * can we interpolate based on interpolation of m3 anim header?
-            fcurves = bpy.data.actions.get(action_name).fcurves
+            fcurves = _get_fcurves(bpy.data.actions.get(action_name))
             # store fcurve references so that we don't have to find them later
             fcurves_loc = []
             for index, index_data in enumerate(anim_data_loc):
@@ -662,7 +674,7 @@ class Importer:
                 action = bpy.data.actions.get(action_name)
                 key_frame_points_len = len(id_data_render[action_name][0]) // 2
 
-                fcurve = action.fcurves.new(pose_bone.path_from_id('m3_batching'), action_group=pose_bone.name)
+                fcurve = _get_fcurves(action).new(pose_bone.path_from_id('m3_batching'), action_group=pose_bone.name)
                 fcurve.select = False
                 fcurve.keyframe_points.add(key_frame_points_len)
                 fcurve.keyframe_points.foreach_set('co', id_data_render[action_name][0])

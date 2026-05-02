@@ -1,3 +1,80 @@
+# M3GLB_ANIM_PATCHED
+
+class _FakeFCurves:
+    def __init__(self, action):
+        self._action = action
+
+    def _ensure_strip(self):
+        a = self._action
+        if not a.layers:
+            a.layers.new(name="Layer")
+        layer = a.layers[0]
+        if not layer.strips:
+            layer.strips.new(type="KEYFRAME")
+        return layer.strips[0]
+
+    def _get_bag(self, strip):
+        bags = list(strip.channelbags)
+        if bags:
+            return bags[0]
+        a = self._action
+        if a.slots:
+            slot = a.slots[0]
+        else:
+            try:
+                slot = a.slots.new(id_type="OBJECT", name="Slot")
+            except TypeError:
+                slot = a.slots.new(target_type="OBJECT", name="Slot")
+        return strip.channelbag(slot, ensure=True)
+
+    def _all(self):
+        result = []
+        for layer in self._action.layers:
+            for strip in layer.strips:
+                for bag in strip.channelbags:
+                    result.extend(bag.fcurves)
+        return result
+
+    def __iter__(self):
+        return iter(self._all())
+
+    def __len__(self):
+        return len(self._all())
+
+    def find(self, path, index=0):
+        for fc in self._all():
+            if fc.data_path == path and fc.array_index == index:
+                return fc
+        return None
+
+    def new(self, path, index=0, action_group="", group_name=""):
+        strip = self._ensure_strip()
+        bag = self._get_bag(strip)
+        for fc in bag.fcurves:
+            if fc.data_path == path and fc.array_index == index:
+                return fc
+        gname = group_name or action_group
+        try:
+            return bag.fcurves.new(path, index=index, group_name=gname)
+        except TypeError:
+            return bag.fcurves.new(path, index=index, action_group=gname)
+
+    def remove(self, fcurve):
+        strip = self._ensure_strip()
+        bag = self._get_bag(strip)
+        bag.fcurves.remove(fcurve)
+
+
+def _get_fcurves(action):
+    native = getattr(action, "fcurves", None)
+    if native is not None:
+        try:
+            list(native)
+            return native
+        except Exception:
+            pass
+    return _FakeFCurves(action)
+
 # ##### BEGIN GPL LICENSE BLOCK #####
 #
 #  This program is free software; you can redistribute it and/or
@@ -37,9 +114,9 @@ def ob_anim_data_set(scene, ob, new_action=None):
     if ob.m3_animations_default is None:
         ob.m3_animations_default = bpy.data.actions.new(ob.name + '_DEFAULTS')
 
-    dft_props = set([(fcurve.data_path, fcurve.array_index) for fcurve in ob.m3_animations_default.fcurves])
-    old_props = set([(fcurve.data_path, fcurve.array_index) for fcurve in ob.animation_data.action.fcurves]) if ob.animation_data.action else set()
-    new_props = set([(fcurve.data_path, fcurve.array_index) for fcurve in new_action.fcurves]) if new_action else set()
+    dft_props = set([(fcurve.data_path, fcurve.array_index) for fcurve in _get_fcurves(ob.m3_animations_default)])
+    old_props = set([(fcurve.data_path, fcurve.array_index) for fcurve in _get_fcurves(ob.animation_data.action)]) if ob.animation_data.action else set()
+    new_props = set([(fcurve.data_path, fcurve.array_index) for fcurve in _get_fcurves(new_action)]) if new_action else set()
 
     for prop in new_props.difference(old_props):
         try:
@@ -70,7 +147,8 @@ def ob_anim_data_set(scene, ob, new_action=None):
 
 # this function is exported to io_m3_import.py
 def set_default_value(action, path, index, value):
-    fcurve = action.fcurves.find(path, index=index) or action.fcurves.new(path, index=index)
+    _fc = _get_fcurves(action)
+    fcurve = _fc.find(path, index=index) or _fc.new(path, index=index)
     fcurve.keyframe_points.insert(0, value)
 
 

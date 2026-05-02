@@ -1,3 +1,10 @@
+# M3GLB_PATCHED
+def _safe_shader(name):
+    try:
+        import gpu as _g; return _g.shader.from_builtin(name)
+    except Exception:
+        return None
+
 # ##### BEGIN GPL LICENSE BLOCK #####
 #
 #  This program is free software; you can redistribute it and/or
@@ -57,7 +64,7 @@ def get_transformed_coords(coords, matrix):
     return new_coords
 
 
-uni_polyline_shader = gpu.shader.from_builtin(POLYLINE_SHADER_ID)
+uni_polyline_shader = _safe_shader(POLYLINE_SHADER_ID)
 
 
 def batch_uni_polyline(coords, indices, color, line_width=0.35):
